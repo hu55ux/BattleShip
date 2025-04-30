@@ -197,21 +197,20 @@ public:
 
 	bool canPlaceShip(Point start, int length, bool horizontal) const {
 		for (int i = 0; i < length; ++i) {
-			int nx = start.getX() + (horizontal ? i : 0);
-			int ny = start.getY() + (horizontal ? 0 : i);
+			int x = start.getX() + (horizontal ? i : 0);
+			int y = start.getY() + (horizontal ? 0 : i);
+			Point p(x, y);
 
-			Point p(nx, ny);
+			if (!isValid(p)) return false;
+			if (_board[y][x] != '.') return false;
 
-			if (!isValid(p)) return false; // Check if the point is within bounds
-			if (_board[nx][ny] != '.') return false; // Check if the cell is already occupied
-
-			// Check surrounding coordinates
+			// Check adjacent cells
 			for (int dx = -1; dx <= 1; ++dx) {
 				for (int dy = -1; dy <= 1; ++dy) {
-					int adjX = nx + dx;
-					int adjY = ny + dy;
-					if (isValid(Point(adjX, adjY)) && _board[adjX][adjY] != '.') {
-						return false; // Check if there is another ship around
+					int nx = x + dx;
+					int ny = y + dy;
+					if (isValid(Point(nx, ny)) && _board[ny][nx] != '.') {
+						return false;
 					}
 				}
 			}
@@ -278,7 +277,7 @@ public:
 		return false;
 	}
 
-	void display(bool hideShips = true) const {
+	void display(bool hideShips = true, bool hideMisses = false) const {
 		cout << "  ";
 		for (int col = 0; col < _size; ++col) {
 			cout << col << " ";
@@ -289,11 +288,14 @@ public:
 			cout << row << " ";
 			for (int col = 0; col < _size; ++col) {
 				char cell = _board[row][col];
-				if (hideShips && cell == 'S') {
-					cout << "# ";
+				if (cell == 'S' && hideShips) {
+					cout << ". "; // Gəmiləri gizlə
+				}
+				else if (cell == 'M' && hideMisses) {
+					cout << ". "; // Uğursuz hücumları gizlə
 				}
 				else {
-					cout << cell << " ";
+					cout << cell << " "; // Digər hallarda normal göstər
 				}
 			}
 			cout << endl;
@@ -340,7 +342,7 @@ private:
 			cin >> input;
 			if (cin.fail() || input < min || input > max) {
 				cin.clear();
-				cin.ignore(numeric_limits<streamsize>::max(), '\n');
+				cin.ignore();
 				cout << "Invalid input! Please enter between "
 					<< min << " and " << max << ": ";
 			}
@@ -401,29 +403,30 @@ public:
 		}
 		else
 		{
-			cout << "Manual placement selected. Use arrow keys to move, SHIFT to toggle orientation, ENTER to place." << endl;
+			system("cls");
+			cout << "Manual placement selected. Use arrows to move, SHIFT to rotate, ENTER to place.\n";
 
-			for (int length : _shipLengths)
-			{
+			for (int length : _shipLengths) {
 				bool placed = false;
 				Point cursor(0, 0);
 				bool horizontal = false;
 
-				while (!placed)
-				{
+				while (!placed) {
+					system("cls");
 					board.display();
 
-					for (int i = 0; i < length; ++i)
-					{
+					// Draw ship preview
+					for (int i = 0; i < length; ++i) {
 						int nx = cursor.getX() + (horizontal ? i : 0);
 						int ny = cursor.getY() + (horizontal ? 0 : i);
-
-						if (board.isValid(Point(nx, ny))) {
-							cout << 'O';
+						if (nx < board.getBoardSize() && ny < board.getBoardSize()) {
+							cout << "\033[32mO\033[0m "; // Green 'O'
 						}
 					}
 
-					cout << "Use arrow keys to move, Shift to toggle orientation, Enter to place, Esc to cancel." << endl;
+					cout << "\nShip length: " << length
+						<< ", Position: (" << cursor.getX() << "," << cursor.getY() << ")"
+						<< ", Orientation: " << (horizontal ? "Horizontal" : "Vertical") << "\n";
 
 					int key = _getch();
 					switch (key)
@@ -445,13 +448,22 @@ public:
 						break;
 
 					case SHIFT:
-						horizontal = !horizontal;
+						if ((horizontal && (cursor.getY() + length - 1 < board.getBoardSize())) ||
+							(!horizontal && (cursor.getX() + length - 1 < board.getBoardSize()))) {
+							horizontal = !horizontal;
+						}
 						break;
-
 					case ENTER_KEY:
 						if (board.canPlaceShip(cursor, length, horizontal)) {
-							board.placeShip()
+							board.placeShip(Point(cursor.getX(), cursor.getY()), length, horizontal);
+							placed = true;
+							cout << "Ship placed successfully!" << endl;
 						}
+						else {
+							cout << "Cannot place ship here! Try another position!" << endl;
+							_getch();
+						}
+						break;
 
 					default:
 						break;
@@ -495,10 +507,66 @@ public:
 	}
 
 	Point selectAttack() override {
-		int x, y;
-		cout << "Enter attack coordinates (x y): ";
-		cin >> x >> y;
-		return Point(x, y);
+		Point cursor(0, 0);
+		bool attackConfirmed = false;
+
+		while (!attackConfirmed)
+		{
+			system("cls||clear");
+			cout << "Select attack coordinates (Use Arrow keys to move, Enter to attack, Esc to cancel: )" << endl;
+
+			cout << " ";
+			for (int i = 0; i < board.getBoardSize(); i++)	cout << i << " ";
+			cout << endl;
+
+			for (int y = 0; y < board.getBoardSize(); ++y)
+			{
+				cout << y << " ";
+				for (int x = 0; x < board.getBoardSize(); ++x)
+				{
+					if (x == cursor.getX() && y == cursor.getY()) {
+						cout << "\033[31mX\033[0m "; // red for cursor
+					}
+					else
+					{
+						cout << _attackBoard[y][x];
+					}
+				}
+				cout << endl;
+			}
+
+			int key = _getch();
+			switch (key)
+			{
+			case KEY_UP:
+				if (cursor.getY() > 0) cursor.decrementY();
+				break;
+			case KEY_DOWN:
+				if (cursor.getY() < board.getBoardSize() - 1) cursor.incrementY();
+				break;
+			case KEY_LEFT:
+				if (cursor.getX() > 0) cursor.decrementX();
+				break;
+			case KEY_RIGHT:
+				if (cursor.getX() < board.getBoardSize()) cursor.incrementX();
+				break;
+			case ENTER_KEY:
+				if (_attackBoard[cursor.getY()][cursor.getX()] == '.') {
+					attackConfirmed = true;
+				}
+				else {
+					cout << "You already attacked here! Try another position!" << endl;
+				}
+				break;
+			case ESC:
+				return Point(-1, -1);
+			default:
+				break;
+			}
+		}
+		return cursor;
+
+
 	}
 
 	void displayBoards() const {
@@ -673,10 +741,37 @@ private:
 	Player* _player1;
 	Player* _player2;
 	bool _isAgainstComputer;
+	bool _isComputerVsComputer;
+
+	// Set text color (Windows specific)
+	void setColor(int color) {
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
+	}
+
+	// Reset to default color
+	void resetColor() {
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
+	}
+
+	// Typewriter effect with color
+	void typeText(const string& text, int color = 7, int delayMs = 7) {
+		setColor(color);
+		for (char c : text) {
+			cout << c << flush;
+			Sleep(delayMs);
+		}
+		resetColor();
+	}
+
+
 
 public:
-	Game(Player* player1, Player* player2) :_player1(player1), _player2(player2),
-		_isAgainstComputer(dynamic_cast<ComputerPlayer*>(_player2) != nullptr) {
+
+	Game(Player* player1, Player* player2)
+		: _player1(player1), _player2(player2),
+		_isAgainstComputer(dynamic_cast<ComputerPlayer*>(_player2) != nullptr),
+		_isComputerVsComputer(dynamic_cast<ComputerPlayer*>(_player1) != nullptr &&
+			dynamic_cast<ComputerPlayer*>(_player2) != nullptr) {
 	}
 
 	void reset() {
@@ -684,101 +779,172 @@ public:
 		_player2->reset();
 	}
 
-	void displayBoards() {
-		cout << "Player 1's board: " << endl;
-		_player1->getBoard().display(false); // Gəmiləri göstərir
+	void displayDualBoards() {
+		system("cls");
 
-		cout << "Player 2's board: " << endl;
-		_player2->getBoard().display(_isAgainstComputer); // Computerə qarşı olduqda gəmiləri gizlədir
+		Board& board1 = _player1->getBoard();
+		Board& board2 = _player2->getBoard();
+		int size = board1.getBoardSize();
 
+		// Display headers
+		setColor(11);
+		cout << "  YOUR FLEET";
+		cout << string(size * 2 - 10, ' ');
+		setColor(12);
+		cout << "ENEMY TERRITORY\n";
+		resetColor();
+
+		// Column numbers
+		cout << "  ";
+		for (int i = 0; i < size; ++i) cout << i << " ";
+		cout << "   ";
+		for (int i = 0; i < size; ++i) cout << i << " ";
+		cout << endl;
+
+		// Display boards
+		for (int y = 0; y < size; ++y) {
+			// Player 1's board (left)
+			setColor(11);
+			cout << y << " ";
+			resetColor();
+			for (int x = 0; x < size; ++x) {
+				char cell = board1.getCell(x, y);
+				if (cell == 'S') setColor(10);      // Your ships - green
+				else if (cell == 'H') setColor(12); // Hits - red
+				else if (cell == 'M') setColor(8);  // Misses - gray
+				cout << cell << " ";
+				resetColor();
+			}
+
+			// Player 2's board (right)
+			cout << "  ";
+			setColor(12);
+			cout << y << " ";
+			resetColor();
+			for (int x = 0; x < size; ++x) {
+				char cell = board2.getCell(x, y);
+				if (cell == 'H') setColor(12);      // Hits - red
+				else if (cell == 'M') setColor(8);  // Misses - gray
+				else {
+					setColor(7);                   // Unexplored - normal
+					cell = '.';                   // Hide opponent's ships
+				}
+				cout << cell << " ";
+				resetColor();
+			}
+			cout << endl;
+		}
+
+		// Legend
+		setColor(10); cout << "S"; resetColor(); cout << " Your Ship  ";
+		setColor(12); cout << "H"; resetColor(); cout << " Hit  ";
+		setColor(8); cout << "M"; resetColor(); cout << " Miss\n";
 	}
 
+	void welcomeMessage() {
+		system("cls");
+		setColor(11);
+		cout << R"(
+                                             ___  ___ ______________   __________ _________ 
+                                            / _ )/ _ /_  __/_  __/ /  / __/ __/ // /  _/ _ \
+                                           / _  / __ |/ /   / / / /__/ _/_\ \/ _  // // ___/
+                                          /____/_/ |_/_/   /_/ /____/___/___/_//_/___/_/    
+                                                  
+)";
+		resetColor();
+
+		typeText("\n\n                  NAVAL COMBAT SIMULATION", 14);
+		typeText("\n=============================================================\n\n", 9);
+
+		typeText("GAME INTRODUCTION:\n", 10);
+		typeText("Battleship is a classic strategy game where two opponents attempt\n", 7);
+		typeText("to locate and destroy each other's fleet of ships on a grid-based\n", 7);
+		typeText("ocean. Your mission is to sink all enemy ships before they sink yours!\n\n", 7);
+
+		typeText("Press any key to continue...", 14);
+		_getch();
+	}
+
+
+
 	void start() {
-		cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << endl;
-		cout << "======= Battle Ship Game =======" << endl;
-		cout << "Starting the game!" << endl;
 
-		// Gəmi yerləşdirmə
+		welcomeMessage();
+
 		bool autoPlace;
-		if (_isAgainstComputer) {
-			cout << "\nComputer is placing ships..." << endl;
-			_player2->placeShips(true); // Kompüter avtomatik yerləşdirir
 
-			cout << "\nPlayer 1, do you want to place ships automatically? (1-Yes, 0-No): ";
+		if (_isComputerVsComputer) {
+			_player1->placeShips(true);
+			_player2->placeShips(true);
+		}
+		else if (_isAgainstComputer) {
+			cout << "Computer is placing automatically..." << endl;
+			_player2->placeShips(true);
+			cout << "Player 1, enable auto ship placement? (1-yes, 0-no): ";
 			cin >> autoPlace;
+			_player1->placeShips(autoPlace);
 		}
 		else {
 			cout << "\nPlayer 1, place your ships:" << endl;
-			cout << "Auto placement? (1-Yes, 0-No): ";
+			cout << "Enable auto placement? (1-Yes, 0-No): ";
 			cin >> autoPlace;
-		}
-		_player1->placeShips(autoPlace);
+			_player1->placeShips(autoPlace);
 
-		if (!_isAgainstComputer) {
 			cout << "\nPlayer 2, place your ships:" << endl;
-			cout << "Auto placement? (1-Yes, 0-No): ";
+			cout << "Enable auto placement? (1-Yes, 0-No): ";
 			cin >> autoPlace;
 			_player2->placeShips(autoPlace);
 		}
 
-		// Oyun dövrü
-		bool player1Turn = true;
-		while (true) {
-			system("cls||clear");
-			displayBoards();
+		Player* current = _player1;
+		Player* opponent = _player2;
 
-			if (player1Turn) {
-				cout << "\n~~~~~~~~~ PLAYER 1'S TURN ~~~~~~~~~" << endl;
-				Point attackPoint = _player1->selectAttack();
-				bool hit = _player2->getBoard().attack(attackPoint);
-				_player1->processAttackResult(attackPoint, hit);
-
-				if (_player2->getBoard().allShipsSunk()) {
-					system("cls||clear");
-					displayBoards();
-					cout << "PLAYER 1 WINS!" << endl;
-					break;
-				}
-
-				if (!hit)
-				{
-					player1Turn = !player1Turn;
-
-				}
+		while (true)
+		{
+			displayDualBoards();
+			if (_isComputerVsComputer) {
+				cout << "Computer " << (current == _player1 ? "1" : "2") << "'S TURN: " << endl;
+			}
+			else if (_isAgainstComputer) {
+				cout << "\n" << (current == _player1 ? "YOUR TURN" : "COMPUTER'S TURN") << "\n";
 			}
 			else {
-				cout << "\n~~~~~~~~~ " << (_isAgainstComputer ? "COMPUTER'S" : "PLAYER 2'S") << " TURN ~~~~~~~~~" << endl;
-				Point attackPoint = _player2->selectAttack();
-				bool hit = _player1->getBoard().attack(attackPoint);
-				_player2->processAttackResult(attackPoint, hit);
+				cout << "\nPLAYER " << (current == _player1 ? "1" : "2") << "'S TURN\n";
+			}
 
-				if (_player1->getBoard().allShipsSunk()) {
-					system("cls||clear");
-					displayBoards();
-					cout << (_isAgainstComputer ? "COMPUTER WINS!" : "PLAYER 2 WINS!") << endl;
-					break;
+			Point attack = current->selectAttack();
+			bool hit = opponent->getBoard().attack(attack);
+			current->processAttackResult(attack, hit);
+
+			if (opponent->getBoard().allShipsSunk()) {
+				displayDualBoards();
+				if (_isComputerVsComputer) {
+					typeText("\nCOMPUTER " + string(current == _player1 ? "1" : "2") + " WINS!\n", 14);
 				}
-				if (!hit)
-				{
-					player1Turn = !player1Turn;
+				else if (_isAgainstComputer) {
+					typeText(current == _player1 ? "\nYOU WIN!\n" : "\nCOMPUTER WINS!\n",
+						current == _player1 ? 10 : 12);
+				}
+				else {
+					typeText("\nPLAYER " + string(current == _player1 ? "1" : "2") + " WINS!\n", 14);
+				}
+				break;
+			}
 
+			if (!hit) {
+				swap(current, opponent);
+				if ((_isAgainstComputer || _isComputerVsComputer) && current == _player2) {
+					cout << "Computer is thinking...";
+					Sleep(1500);
 				}
 			}
 
-			// Növbə dəyişikliyi və gözləmə
-
-
-			if (_isAgainstComputer && !player1Turn) {
-				cout << "Computer is thinking..." << endl;
-				this_thread::sleep_for(chrono::seconds(1));
-			}
-			else {
-				this_thread::sleep_for(chrono::seconds(1));
-			}
 		}
 
-		cout << "\nGame Over! Thanks for playing!" << endl;
+		typeText("\nGame Over! Thanks for playing!\n", 14);
+
 	}
+
 
 };
 
