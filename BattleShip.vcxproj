@@ -130,7 +130,14 @@
     <ClCompile Include="BattleShip.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="board.h" />
     <ClInclude Include="class.h" />
+    <ClInclude Include="computerPlayer.h" />
+    <ClInclude Include="constants.h" />
+    <ClInclude Include="humanPlayer.h" />
+    <ClInclude Include="playerBase.h" />
+    <ClInclude Include="point.h" />
+    <ClInclude Include="ship.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

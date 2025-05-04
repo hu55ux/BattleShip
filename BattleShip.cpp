@@ -10,8 +10,10 @@
 #include <windows.h> // For color and animation
 #include <memory>
 #include <iomanip>
+#include <queue>
 
 using namespace std;
+
 
 #include "class.h"
 
