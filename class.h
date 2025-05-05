@@ -104,7 +104,7 @@ private:
 		// Display column numbers for both boards
 		cout << "   ";
 		for (int i = 0; i < size; ++i) cout << setw(2) << i << " ";
-		cout << "    ";
+		cout << "       ";
 		for (int i = 0; i < size; ++i) cout << setw(2) << i << " ";
 		cout << endl;
 
@@ -116,19 +116,19 @@ private:
 			resetColor();
 			for (int x = 0; x < size; ++x) {
 				char cell = board1.getCell(x, y);
-				if (cell == 'S') setColor(10);      // Player ships - green
-				else if (cell == 'H') setColor(12); // Hits - red
+				if (cell == 'H') setColor(12);      // Hits - red
 				else if (cell == 'M') setColor(8);  // Misses - gray
-				cout << setw(2) << cell << " ";
+				else if (cell == 'S') setColor(10); // Ships - green (only visible after being hit)
+				cout << setw(2) << (cell == 'S' ? '#' : cell) << " "; // Show ships as water (~) until hit
 				resetColor();
 			}
 
 			// Space between the two boards
-			cout << "    ";
+			cout << "   ";
 
 			// Player 2's board (right)
 			setColor(12); // Red for row numbers
-			cout << setw(2) << y << " ";
+			cout << setw(3) << y << " ";
 			resetColor();
 			for (int x = 0; x < size; ++x) {
 				char cell = board2.getCell(x, y);
@@ -137,7 +137,7 @@ private:
 				if (cursor.getX() == x && cursor.getY() == y) {
 					setColor(14); // Yellow background
 					setColor(12); // Red text
-					cout << "X ";  // Cursor symbol
+					cout << " X ";  // Cursor symbol
 					resetColor();
 				}
 				else {
@@ -155,7 +155,6 @@ private:
 		}
 
 		// Display legend
-		setColor(10); cout << "S"; resetColor(); cout << " Your Ship  ";
 		setColor(12); cout << "H"; resetColor(); cout << " Hit  ";
 		setColor(8); cout << "M"; resetColor(); cout << " Miss  ";
 		setColor(14); cout << "X"; resetColor(); cout << " Cursor\n";
@@ -189,7 +188,6 @@ private:
 		}
 	}
 
-	// Display the welcome message
    // Display the welcome message
 	void welcomeMessage() {
 		system("cls||clear");
@@ -245,7 +243,7 @@ public:
 	}
 
 	void start() {
-		welcomeMessage();
+		//welcomeMessage();
 
 		int choice = getGameMode();
 		if (choice == 3) {
